@@ -71,7 +71,7 @@
         }
 
         #log {
-            background: #aaa;
+            background: #66c;
             margin: 0;
             /* padding: 0.5em 0.5em 0.5em 0.5em; */
             position: absolute;
@@ -101,6 +101,12 @@
             height: 2em;
             color: black;
         }
+        .chat-item {
+            border: 2px solid #990;
+            text-align: left;
+            border-top: 0px;
+            padding: 3px 5px 3px 5px;
+        }
     </style>
 </head>
     <body>
@@ -118,10 +124,10 @@
 
                 <!-- Sidebar -->
                 <div id="sidebar-wrapper">
-                    <form id="form">
+                    <div id="form">
                         <div id="log"></div>
-                        <input type="text" id="msg" size="64"/>
-                    </form>
+                        <input type="text" id="chatMsg" size="64"/>
+                    </div>
                 </div>
                 <!-- /#sidebar-wrapper -->
 
@@ -166,6 +172,12 @@
                 WSObj.sendData('Register', { Playername: uname } );
             }
 
+            function sendChat(e) {
+                var chatMsg = $('#chatMsg').val();
+                $('#chatMsg').val("");
+                WSObj.sendData('Chat', { Lobby: "Global", Message: chatMsg } );
+            }
+
             function appendLog(item) {
                 var doScroll = $('#log').scrollTop > $('#log').scrollHeight - $('#log').clientHeight - 1;
                 $('#log').append(item);
@@ -177,6 +189,7 @@
                 WSObj.registerCallback('RegistrationOK', function(res) {
                     myself = new Player(res);
                     open_curtain();
+                    $('#chatMsg').focus();
                 }).registerCallback('close', function(res) {
                     myself = null;
                     resetLoginView();
@@ -184,13 +197,15 @@
                     myself = null;
                     resetLoginView();
                 }).registerCallback('chat', function(res) {
-                    var item = $("<div>");
-                    item.innerText = messages[i];
+                    var item = $("<div>").addClass("chat-item");
+                    item.html(res.Message);
                     appendLog(item);
                 });
 
                 $('#username').keypress(function(e) {if(e.which == 13) register(e);});
                 $('#submit').click(register);
+
+                $('#chatMsg').keypress(function(e) {if(e.which == 13) sendChat(e);});
             });
         </script>
     </body>

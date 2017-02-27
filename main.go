@@ -9,13 +9,15 @@ import (
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
 var addr = flag.String("addr", ":8080", "http service address")
+var logObj = log.New(os.Stdout, "BattleShips: ", log.Ldate|log.Ltime)
 
 func serveHome(w http.ResponseWriter, r *http.Request) {
-	log.Println(r.URL)
+	logObj.Println(r.URL)
 	if r.URL.Path != "/" {
 		http.Error(w, "Not found", 404)
 		return
@@ -29,6 +31,8 @@ func serveHome(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	flag.Parse()
+
+	initHubs()
 
 	r := mux.NewRouter()
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
@@ -46,8 +50,9 @@ func main() {
 		ReadTimeout:  15 * time.Second,
 	}
 
+	logObj.Print("Server Started and Listening")
 	err := srv.ListenAndServe()
 	if err != nil {
-		log.Fatal("ListenAndServe: ", err)
+		logObj.Fatal("ListenAndServe: ", err)
 	}
 }

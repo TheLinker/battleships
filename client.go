@@ -7,7 +7,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -46,7 +46,6 @@ type Client struct {
 	Player *Player
 }
 
-
 // readPump pumps messages from the websocket connection to the hub.
 //
 // The application runs readPump in a per-connection goroutine. The application
@@ -64,12 +63,17 @@ func (c *Client) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				log.Println("error: %v", err)
+				logObj.Println("error: %v", err)
 			}
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		log.Println("recibido: ", string(message))
+
+		if c.Player != nil {
+			logObj.Printf("%s -> %s", c.Player.Playername, string(message))
+		} else {
+			logObj.Printf("%s -> %s", "(no_player)", string(message))
+		}
 
 		var msg json.RawMessage
 		env := Envelope{
@@ -77,7 +81,7 @@ func (c *Client) readPump() {
 		}
 
 		if err := json.Unmarshal(message, &env); err != nil {
-			log.Println("Error: ", err)
+			logObj.Println("Error: ", err)
 			return
 		}
 
@@ -85,18 +89,18 @@ func (c *Client) readPump() {
 		case "REGISTER":
 			var r Registration
 			if err := json.Unmarshal(msg, &r); err != nil {
-				log.Println("Error: ", err)
+				logObj.Println("REGISTER Error: ", err)
 				return
 			}
 
 			var uname = r.Playername
 
-			log.Println("uname", uname)
+			logObj.Println("uname", uname)
 
-            c.Player = CreatePlayer(c, uname)
+			c.Player = CreatePlayer(c, uname)
 
-            // c.hubs = append(c.hubs, GlobalLobby)
-            // GlobalLobby.register <- c
+			// c.hubs = append(c.hubs, GlobalLobby)
+			globalLobby.register <- c
 
 			resp := Envelope{
 				Type: "RegistrationOK",
@@ -109,21 +113,42 @@ func (c *Client) readPump() {
 			buf, _ := json.Marshal(resp)
 			c.send <- buf
 
-            break
+			break
 
-        case "CHAT":
-            var r Chat
+		case "CHAT":
+			var r Chat
 
-            if err := json.Unmarshal(msg, &r); err != nil {
-                log.Println("Error: ", err)
-                return
-            }
+			if c.Player == nil {
+				break
+			}
 
-            // if c.hubs != nil {
-            //     c.hubs.broadcast <- message
-            // }
+			if err := json.Unmarshal(msg, &r); err != nil {
+				logObj.Print("CHAT Error: ", err)
+				break
+			}
+
+			if (r.Lobby == "") || (r.Message == "") {
+				break
+			}
+
+			hub := findHubNamed(r.Lobby)
+
+			if hub == nil {
+				break
+			}
+
+			retMsg := fmt.Sprintf("%s: %s", c.Player.Playername, r.Message)
+			buf, _ := json.Marshal(Envelope{
+				Type: "Chat",
+				Msg: Chat{
+					Lobby:   r.Lobby,
+					Message: retMsg,
+				},
+			})
+
+			hub.broadcast <- buf
 		}
-    }
+	}
 }
 
 // writePump pumps messages from the hub to the websocket connection.
@@ -134,17 +159,17 @@ func (c *Client) readPump() {
 func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
-        if c.Player != nil {
-            log.Printf("Client killed (%s)\n",  c.Player.Playername)
-        } else {
-            log.Printf("Client killed (no player)\n")
-        }
+		if c.Player != nil {
+			logObj.Printf("Client killed (%s)\n", c.Player.Playername)
+		} else {
+			logObj.Printf("Client killed (no player)\n")
+		}
 
-        for _, h := range(c.hubs) {
-           h.unregister <- c
-        }
+		for _, h := range c.hubs {
+			h.unregister <- c
+		}
 
-        DeletePlayer(c.Player)
+		DeletePlayer(c.Player)
 
 		ticker.Stop()
 		c.conn.Close()
@@ -163,6 +188,13 @@ func (c *Client) writePump() {
 			if err != nil {
 				return
 			}
+
+			if c.Player != nil {
+				logObj.Printf("%s <- %s", c.Player.Playername, string(message))
+			} else {
+				logObj.Printf("%s <- %s", "(no_player)", string(message))
+			}
+
 			w.Write(message)
 
 			// Add queued chat messages to the current websocket message.
@@ -188,7 +220,7 @@ func (c *Client) writePump() {
 func serveWs(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println(err)
+		logObj.Println(err)
 		return
 	}
 

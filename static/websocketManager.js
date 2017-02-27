@@ -29,8 +29,8 @@ MyWebSocket.prototype.connect = function() {
 
             console.log(msg);
 
-            if(typeof msg.Type !== 'undefined' && typeof that.callbacks[msg.Type] !== 'undefined')
-                that.callbacks[msg.Type](msg.Msg);
+            if(typeof msg.Type !== 'undefined' && typeof that.callbacks[msg.Type.toLowerCase()] !== 'undefined')
+                that.callbacks[msg.Type.toLowerCase()](msg.Msg);
         };
         this.conn.onerror = function (evt) {
             that.callbacks['error'](evt.message);
@@ -47,7 +47,7 @@ MyWebSocket.prototype.close = function(code) {
 
 MyWebSocket.prototype.registerCallback = function(type, func) {
     if (typeof func !== "function") throw("func not a function");
-    this.callbacks[type] = func;
+    this.callbacks[type.toLowerCase()] = func;
 
     return this;
 }
@@ -61,6 +61,7 @@ MyWebSocket.prototype.removeCallback = function(type) {
 MyWebSocket.prototype.sendData = function(type, msg) {
     try {
         if (this.conn && this.conn.readyState === 1) {
+            console.log({"type": type,"msg": msg});
             this.conn.send(JSON.stringify({
                 "type": type,
                 "msg": msg

@@ -36,6 +36,7 @@ func main() {
 
 	r := mux.NewRouter()
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	r.PathPrefix("/favicon.ico").Handler(http.FileServer(http.Dir("static")))
 
 	r.HandleFunc("/", serveHome)
 	r.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

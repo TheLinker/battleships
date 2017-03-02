@@ -1,6 +1,8 @@
 package main
 
-import ()
+import (
+    "errors"
+)
 
 type Player struct {
 	Client     *Client
@@ -10,16 +12,25 @@ type Player struct {
 
 var Players []*Player
 
-func CreatePlayer(client *Client, name string) *Player {
-	pl := &Player{
-		Client:     client,
-		Playername: name,
-		Playerhash: RandStringBytesRmndr(),
-	}
+func CreatePlayer(client *Client, name string) (err error, pl *Player) {
+    for _, pl = range(Players) {
+        if pl.Playername == name && pl.Client != nil {
+            return errors.New("Nickname already taken"), nil
+        } else if pl.Playername == name && pl.Client == nil {
+            pl.Client = client
+            return
+        }
+    }
 
-	Players = append(Players, pl)
+    pl = &Player {
+        Client: client,
+        Playername: name,
+        Playerhash: RandStringBytesRmndr(),
+    }
 
-	return pl
+    Players = append(Players, pl)
+
+    return
 }
 
 func DeletePlayer(player *Player) bool {

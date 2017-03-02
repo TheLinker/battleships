@@ -97,7 +97,21 @@ func (c *Client) readPump() {
 
 			logObj.Println("uname", uname)
 
-			c.Player = CreatePlayer(c, uname)
+			err, pl := CreatePlayer(c, uname)
+			c.Player = pl
+
+			if err != nil {
+				resp := Envelope{
+					Type: "Error",
+					Msg: ErrorMsg {
+						Message: err.Error(),
+					},
+				}
+
+				buf, _ := json.Marshal(resp)
+				c.send <- buf
+				break
+			}
 
 			// c.hubs = append(c.hubs, GlobalLobby)
 			globalLobby.register <- c
@@ -160,6 +174,7 @@ func (c *Client) writePump() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		if c.Player != nil {
+			c.Player.Client = nil
 			logObj.Printf("Client killed (%s)\n", c.Player.Playername)
 		} else {
 			logObj.Printf("Client killed (no player)\n")
@@ -169,7 +184,7 @@ func (c *Client) writePump() {
 			h.unregister <- c
 		}
 
-		DeletePlayer(c.Player)
+		// DeletePlayer(c.Player)
 
 		ticker.Stop()
 		c.conn.Close()

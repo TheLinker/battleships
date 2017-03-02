@@ -16,8 +16,12 @@ type RegistrationOK struct {
 	Playerhash string
 }
 
+type ErrorMsg struct {
+    Message string
+}
+
 // C <-> S
 type Chat struct {
-	Lobby   string
-	Message string
+    Lobby   string
+    Message string
 }

@@ -4,6 +4,7 @@
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
 
+    <link rel="stylesheet" type="text/css" href="/static/fa/css/font-awesome.min.css">
     <link rel="stylesheet" type="text/css" href="/static/sidebar.css">
 
     <script src="https://code.jquery.com/jquery-3.1.1.min.js" integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous"></script>
@@ -107,6 +108,28 @@
             border-top: 0px;
             padding: 3px 5px 3px 5px;
         }
+        #errorMsg {
+            color: #da3f3f;
+            text-align: center;
+            font-weight: bold;
+            text-shadow: 1px 1px #9a9a9a;
+        }
+
+        .board td {
+            border: 1px solid white;
+            width: 40px;
+            height: 40px;
+        }
+        i.hit {
+            color: green;
+        }
+        i.miss {
+            color: red;
+        }
+
+        i.hit,i.miss {
+            font-size: 30px;
+        }
     </style>
 </head>
     <body>
@@ -116,6 +139,7 @@
                     <input type="text" class="form-control" name="username" id="username" placeholder="User Name" value="TheLinker">
                 </div>
                 <button class="btn btn-primary col-md-12" id="submit">Enter</button>
+                <div class="has-error" id="errorMsg">&nbsp;</div>
             </div>
         </div>
             
@@ -126,7 +150,7 @@
                 <div id="sidebar-wrapper">
                     <div id="form">
                         <div id="log"></div>
-                        <input type="text" id="chatMsg" size="64"/>
+                        <input type="text" id="chatMsg" size="16" data-lobby="Global"/>
                     </div>
                 </div>
                 <!-- /#sidebar-wrapper -->
@@ -135,11 +159,14 @@
                 <div id="page-content-wrapper">
                     <div class="container-fluid">
                         <div class="row">
-                            <div class="col-lg-12">
+                            <div class="col-lg-4 col-lg-offset-4">
+                                <button class="btn btn-primary col-lg-12">Join a Game!</button>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <div class="col-md-12" id="mainBoard"></div>
                 <!-- /#page-content-wrapper -->
 
             </div>
@@ -147,7 +174,45 @@
             
         <script type="text/javascript">
             var WSObj;
-            var myself;
+            var myself = null;
+            // var mygame = null;
+            var mygame = [
+                [0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0],
+                [0,0,1,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,1,0,0,0,0,0],
+                [0,0,0,1,2,1,0,0,0,0],
+                [0,0,0,0,2,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0],
+                [0,0,0,0,0,0,0,0,0,0],
+            ];
+
+            function build_a_board(container) {
+                var table = $('<table>').addClass('board');
+
+                var head = $('<tr>');
+                for(var i = 0 ; i <= 10 ; i++ ) head.append($('<td>').addClass('board-header').html(i?i:''));
+                table.append(head);
+
+                for (var i = 0; i < 10; i++) {
+                    var row = $('<tr>');
+                    for (var j = 0; j <= 10; j++) {
+                        if(!j) 
+                            row.append($('<td>').addClass('board-header').html(String.fromCharCode('A'.charCodeAt() + i)));
+                        else {
+                            var content = '&nbsp;';
+                            if(mygame[i][j] == 1) content = '<i class="fa fa-times miss"></i>';
+                            else if(mygame[i][j] == 2) content = '<i class="fa fa-check hit"></i>';
+                            row.append($('<td>').html(content));
+                        }
+                    }
+                    table.append(row);
+                }
+
+                container.html(table);
+            }
 
             function toggle_curtain() {
                 $('.curtain').toggleClass('curtain__panel__open')
@@ -172,10 +237,10 @@
                 WSObj.sendData('Register', { Playername: uname } );
             }
 
-            function sendChat(e) {
+            function sendChat(container, e) {
                 var chatMsg = $('#chatMsg').val();
                 $('#chatMsg').val("");
-                WSObj.sendData('Chat', { Lobby: "Global", Message: chatMsg } );
+                WSObj.sendData('Chat', { Lobby: container.data('lobby'), Message: chatMsg } );
             }
 
             function appendLog(item) {
@@ -192,10 +257,11 @@
                     $('#chatMsg').focus();
                 }).registerCallback('close', function(res) {
                     myself = null;
-                    resetLoginView();
+                    // resetLoginView();
                 }).registerCallback('error', function(res) {
                     myself = null;
-                    resetLoginView();
+                    $('#errorMsg').html(res?res.Message:"");
+                    // resetLoginView();
                 }).registerCallback('chat', function(res) {
                     var item = $("<div>").addClass("chat-item");
                     item.html(res.Message);
@@ -205,7 +271,7 @@
                 $('#username').keypress(function(e) {if(e.which == 13) register(e);});
                 $('#submit').click(register);
 
-                $('#chatMsg').keypress(function(e) {if(e.which == 13) sendChat(e);});
+                $('#chatMsg').keypress(function(e) {if(e.which == 13) sendChat($(this), e);});
             });
         </script>
     </body>
